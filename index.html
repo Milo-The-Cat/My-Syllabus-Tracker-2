@@ -175,6 +175,18 @@ main{display:flex;flex-direction:column;gap:16px;min-width:0}
 .timer b{font-size:32px;font-weight:500;font-variant-numeric:tabular-nums;line-height:1.2;display:block}
 .tbtns{display:flex;gap:8px;flex-wrap:wrap}
 
+/* subject + chapter picker */
+.pick{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.6fr);gap:8px;margin:12px 0 16px}
+.pick label{display:flex;flex-direction:column;gap:4px;min-width:0}
+.pk-l{font-size:12px;color:var(--muted)}
+.pick select{appearance:none;-webkit-appearance:none;width:100%;min-width:0;height:36px;padding:0 32px 0 12px;border-radius:var(--r-ctl);border:1px solid var(--line2);background-color:var(--bg);font-size:14px;color:var(--fg);text-overflow:ellipsis;cursor:pointer;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='16' height='16' fill='none' stroke='%23888' stroke-width='1.5' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 6l4 4 4-4'/%3E%3C/svg%3E");background-repeat:no-repeat;background-position:right 10px center;transition:border-color .15s var(--ease),background-color .15s var(--ease)}
+.pick select:hover{border-color:var(--muted)}
+.pick select:disabled{opacity:.55;cursor:default}
+.pick select option,.pick select optgroup{background:var(--surface);color:var(--fg)}
+.cont .bar i{background:var(--c,var(--accent))}
+.cont h2{display:flex;align-items:center;gap:10px}
+.cont h2::before{content:"";width:8px;height:8px;border-radius:50%;background:var(--c);flex:0 0 auto}
+
 /* today's plan */
 .tl2{list-style:none;margin:0;padding:0}
 .tl2 li{display:flex;align-items:center;gap:8px;min-height:36px}
@@ -219,6 +231,23 @@ main{display:flex;flex-direction:column;gap:16px;min-width:0}
 .hc.fut{background:transparent;box-shadow:inset 0 0 0 1px var(--line)}
 .hc.today{box-shadow:inset 0 0 0 1.5px var(--fg)}
 .hleg{display:flex;align-items:center;gap:4px;font-size:12px;color:var(--muted);margin-top:8px}
+.hl-tip{margin-left:auto}
+.hgrid .hc[data-act]{cursor:pointer}
+.hc.sel{box-shadow:inset 0 0 0 2px var(--fg)}
+.hc .hd{position:absolute;right:5px;bottom:5px;display:flex;gap:2px}
+.hc .hd b{width:5px;height:5px;border-radius:50%;background:var(--c);box-shadow:0 0 0 1px var(--surface)}
+.hdet{margin-top:12px;padding-top:16px;border-top:1px solid var(--line);animation:fadein .25s var(--ease)}
+.hd-h{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:8px}
+.hd-h b{font-weight:500;font-size:14px}
+.hd-h span{font-family:var(--font-m);font-size:12px;color:var(--fg2)}
+.hd-l{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:2px}
+.hd-l button,.hd-o{width:100%;display:flex;align-items:center;gap:12px;text-align:left;background:none;border:0;border-radius:8px;padding:8px;transition:background-color .15s var(--ease)}
+.hd-l button:hover{background:var(--raised)}
+.hd-l .dot{width:8px;height:8px;border-radius:50%;background:var(--c,var(--muted));flex:0 0 auto}
+.hd-l span{flex:1;min-width:0;display:flex;flex-direction:column}
+.hd-l span b{font-weight:400;font-size:14px}
+.hd-l small{font-size:12px;color:var(--muted)}
+.hd-l em{font-family:var(--font-m);font-size:12px;color:var(--fg2);font-variant-numeric:tabular-nums}
 .hleg .hc{width:14px;height:14px;aspect-ratio:auto;border-radius:3px}
 
 /* exams */
@@ -618,6 +647,8 @@ function normalize(o){
     rev:(o.rev&&typeof o.rev==='object')?o.rev:{},
     weak:(o.weak&&typeof o.weak==='object')?o.weak:{},
     dd:(o.dd&&typeof o.dd==='object')?o.dd:{},
+    pick:(o.pick&&typeof o.pick==='object'&&typeof o.pick.ck==='string')?{ck:o.pick.ck}:null,
+    slog:(o.slog&&typeof o.slog==='object')?o.slog:{},
     pomo:(o.pomo&&typeof o.pomo==='object'&&(o.pomo.m==='f'||o.pomo.m==='b')&&+o.pomo.rem>0)?{m:o.pomo.m,end:+o.pomo.end||0,rem:+o.pomo.rem,round:Math.max(1,Math.floor(+o.pomo.round||1))}:{m:'f',end:0,rem:1500,round:1}
   };
 }
@@ -769,13 +800,42 @@ function greeting(){var h=new Date().getHours();return h<5?'Good night':h<12?'Go
 
 
 /* ===== New features: pomodoro, heatmap, plan, badges, revision, weak ===== */
-function addLog(sec){var k=dkey(new Date());S.log[k]=(S.log[k]||0)+sec}
+function addLog(sec,ck){
+  var k=dkey(new Date());S.log[k]=(S.log[k]||0)+sec;
+  if(ck){var d=S.slog[k]=S.slog[k]||{};d[ck]=(d[ck]||0)+sec}
+}
+/* the chapter the student chose to study, or the next unfinished one */
+function validCk(ck){if(typeof ck!=='string')return null;var a=ck.split('.'),p=byId(PAPERS,a[0]);return (p&&p.ch[+a[1]])?{p:p,ci:+a[1],ck:ck,title:p.ch[+a[1]][0]}:null}
+function pickedChapter(){return (S.pick&&validCk(S.pick.ck))||nextChapter()}
+function firstOpenIn(sid){
+  var s=byId(DATA,sid),out=null,first=null;
+  s.papers.forEach(function(p){p.ch.forEach(function(c,ci){
+    var o={ck:p.id+'.'+ci};if(!first)first=o;
+    var st=chStat(p,ci);if(!out&&st.t&&st.d<st.t)out=o;
+  })});
+  return (out||first).ck;
+}
+function pickHtml(cur,locked){
+  var sid=cur?cur.p.sid:DATA[0].id,dis=locked?' disabled':'';
+  var h='<div class="pick"><label><span class="pk-l">Subject</span><select data-act="picks" aria-label="Subject"'+dis+'>';
+  DATA.forEach(function(s){h+='<option value="'+s.id+'"'+(s.id===sid?' selected':'')+'>'+(SEN[s.id]||s.name)+'</option>'});
+  h+='</select></label><label><span class="pk-l">Chapter</span><select data-act="pickc" aria-label="Chapter"'+dis+'>';
+  byId(DATA,sid).papers.forEach(function(p,pi,arr){
+    if(arr.length>1)h+='<optgroup label="'+(pi?'2nd paper':'1st paper')+'">';
+    p.ch.forEach(function(c,ci){
+      var ck=p.id+'.'+ci,st=chStat(p,ci),done=st.t&&st.d===st.t;
+      h+='<option value="'+ck+'"'+(cur&&cur.ck===ck?' selected':'')+'>'+bn(ci+1)+'. '+esc(c[0])+(done?'  · done':'')+'</option>';
+    });
+    if(arr.length>1)h+='</optgroup>';
+  });
+  return h+'</select></label></div>';
+}
 function bumpDay(n){var k=dkey(new Date());S.dd[k]=Math.max(0,(S.dd[k]||0)+n)}
 function pomoRem(){var p=S.pomo;return p.end>0?Math.max(0,Math.round((p.end-Date.now())/1000)):p.rem}
 function pomoTotal(){var p=S.pomo;return p.m==='f'?1500:(p.round%4===0?900:300)}
 function pomoNext(){
   var p=S.pomo,done=pomoTotal()-pomoRem();
-  if(p.m==='f'){if(done>=60)addLog(done);p.m='b'}else{p.m='f';p.round++}
+  if(p.m==='f'){if(done>=60){var pk=pickedChapter();addLog(done,pk&&pk.ck)}p.m='b'}else{p.m='f';p.round++}
   p.end=0;p.rem=pomoTotal();
 }
 function pomoTick(){
@@ -797,7 +857,7 @@ function pomoTick(){
 var PC=2*Math.PI*44;
 setInterval(pomoTick,1000);
 function pomoHtml(){
-  var p=S.pomo,r=pomoRem(),run=p.end>0,nx=nextChapter();
+  var p=S.pomo,r=pomoRem(),run=p.end>0,nx=pickedChapter();
   var h='<section class="card pomo'+(run?' run':'')+'"><div class="chead"><h2>Pomodoro</h2><span class="sub">Round '+(((p.round-1)%4)+1)+' of 4</span></div>';
   h+='<div class="pm-ring"><svg viewBox="0 0 100 100" aria-hidden="true"><circle class="trk" cx="50" cy="50" r="44"/><circle id="pm-a" class="arc" cx="50" cy="50" r="44" stroke-dasharray="'+PC+'" stroke-dashoffset="'+(PC*(1-r/pomoTotal()))+'"/></svg><div class="txt"><b id="pm-t">'+pad(Math.floor(r/60))+':'+pad(r%60)+'</b><span>'+(run?'<i class="live"></i>':'')+(p.m==='f'?'Focus time':'Break time')+'</span></div></div>';
   h+='<div class="btns"><button class="btn big" type="button" data-act="pomo">'+(run?'Pause':'Start')+'</button><button class="btn" type="button" data-act="pomoskip">'+(p.m==='f'?'Skip':'Skip break')+'</button><button class="btn" type="button" data-act="pomoreset">Reset</button></div>';
@@ -812,12 +872,38 @@ function heatHtml(){
     var key=y+'-'+pad(m+1)+'-'+pad(d),sec=(S.log[key]||0)+(key===tk?elapsed():0);
     tot+=sec;
     var lv=sec<=0?0:sec<1800?1:sec<3600?2:sec<7200?3:4;
-    cells+='<span style="--i:'+(off+d-1)+'" class="hc lv'+lv+(key>tk?' fut':'')+(key===tk?' today':'')+'" title="'+key+': '+fmt(sec)+'"><i>'+d+'</i></span>';
+    var subs=daySubjects(key),dots='';
+    subs.slice(0,3).forEach(function(sid){dots+='<b class="s-'+sid+'"></b>'});
+    var fut=key>tk;
+    cells+='<span style="--i:'+(off+d-1)+'" class="hc lv'+lv+(fut?' fut':'')+(key===tk?' today':'')+(key===hday?' sel':'')+'"'+(fut?'':' role="button" tabindex="0" data-act="hday" data-day="'+key+'"')+' title="'+key+': '+fmt(sec)+'"><i>'+d+'</i>'+(dots?'<em class="hd">'+dots+'</em>':'')+'</span>';
   }
   var h='<section class="card heat"><div class="chead"><h2>Study heatmap</h2><span class="sub">'+n.toLocaleDateString('en-US',{month:'long',year:'numeric'})+' · '+fmt(tot)+'</span></div>';
   h+='<div class="hdays"><span>Mon</span><span>Tue</span><span>Wed</span><span>Thu</span><span>Fri</span><span>Sat</span><span>Sun</span></div><div class="hgrid">'+cells+'</div>';
-  h+='<div class="hleg">Less <span class="hc lv0"></span><span class="hc lv1"></span><span class="hc lv2"></span><span class="hc lv3"></span><span class="hc lv4"></span> More</div></section>';
-  return h;
+  h+='<div class="hleg">Less <span class="hc lv0"></span><span class="hc lv1"></span><span class="hc lv2"></span><span class="hc lv3"></span><span class="hc lv4"></span> More<span class="hl-tip">Tap a day to see what you studied</span></div>';
+  return h+dayHtml(hday)+'</section>';
+}
+var hday=dkey(new Date());
+/* chapters studied on a day, with today's running timer included */
+function dayRows(key){
+  var m={},src=S.slog[key]||{};
+  Object.keys(src).forEach(function(ck){m[ck]=(m[ck]||0)+(+src[ck]||0)});
+  if(key===dkey(new Date())&&S.timer&&elapsed()>0)m[S.timer.ck]=(m[S.timer.ck]||0)+elapsed();
+  return Object.keys(m).map(function(ck){return {c:validCk(ck),sec:m[ck]}}).filter(function(x){return x.c&&x.sec>0}).sort(function(a,b){return b.sec-a.sec});
+}
+function daySubjects(key){
+  var out=[];dayRows(key).forEach(function(r){if(out.indexOf(r.c.p.sid)<0)out.push(r.c.p.sid)});return out;
+}
+function dayHtml(key){
+  var d=new Date(key+'T00:00:00'),tot=(S.log[key]||0)+(key===dkey(new Date())?elapsed():0),rows=dayRows(key),named=0;
+  var h='<div class="hdet" aria-live="polite"><div class="hd-h"><b>'+d.toLocaleDateString('en-US',{weekday:'long',month:'long',day:'numeric'})+'</b><span>'+(tot>0?fmt(tot):'')+'</span></div>';
+  if(!rows.length&&tot<=0)return h+'<p class="sub">Nothing studied on this day.</p></div>';
+  h+='<ul class="hd-l">';
+  rows.forEach(function(r){
+    named+=r.sec;
+    h+='<li class="s-'+r.c.p.sid+'"><button type="button" data-act="goto" data-ck="'+r.c.ck+'"><i class="dot"></i><span><b>'+esc(r.c.title)+'</b><small>'+r.c.p.en+' · Chapter '+(r.c.ci+1)+'</small></span><em>'+fmt(r.sec)+'</em></button></li>';
+  });
+  if(tot-named>=60)h+='<li><div class="hd-o"><i class="dot"></i><span><b>Other study time</b><small>Logged before chapters were tracked</small></span><em>'+fmt(tot-named)+'</em></div></li>';
+  return h+'</ul></div>';
 }
 function planHtml(){
   var up=upcoming(),st=allStat(),rem=st.t-st.d;
@@ -980,20 +1066,19 @@ function renderDash(){
   h+='</div><div class="col">';
 
   /* continue studying */
-  h+='<section class="card cont"><div class="eyebrow">Continue studying</div>';
-  if(nx){
-    h+='<h2>'+esc(nx.title)+'</h2><p class="sub">'+nx.p.en+' · Chapter '+(nx.ci+1)+'</p><span class="bar"><i data-k="c:'+nx.p.id+':'+nx.ci+'" data-v="bar"></i></span>';
-  }else{
-    h+='<h2>All chapters done</h2><p class="sub">Nothing left to study. Time to revise.</p>';
-  }
+  var tmc=tm?validCk(tm.ck):null,pk=tmc||pickedChapter()||validCk(PAPERS[0].id+'.0');
+  var pst=chStat(pk.p,pk.ci),pdone=pst.t&&pst.d===pst.t;
+  h+='<section class="card cont s-'+pk.p.sid+'"><div class="eyebrow">'+(tm?'Studying now':(S.pick?'Study this':'Continue studying'))+'</div>';
+  h+=pickHtml(pk,!!tm);
+  h+='<h2>'+esc(pk.title)+'</h2><p class="sub">'+pk.p.en+' · Chapter '+(pk.ci+1)+(pdone?' · done, good for revision':'')+'</p><span class="bar"><i data-k="c:'+pk.p.id+':'+pk.ci+'" data-v="bar"></i></span>';
+  if(!nx&&!S.pick)h+='<p class="sub" style="margin-top:12px">Every chapter is done. Pick one to revise.</p>';
   if(tm){
     var running=!!(+tm.startedAt);
-    var tp=chapterOf(tm.ck);
-    h+='<div class="timer'+(running?' run':'')+'"><div><small>'+(running?'<i class="live"></i>':'')+'Studying: '+esc(tp.p.ch[tp.ci][0])+'</small><b id="tm">'+clock(elapsed())+'</b></div><div class="tbtns">';
+    h+='<div class="timer'+(running?' run':'')+'"><div><small>'+(running?'<i class="live"></i>':'')+(running?'Timer running':'Paused')+'</small><b id="tm">'+clock(elapsed())+'</b></div><div class="tbtns">';
     h+='<button class="btn" type="button" data-act="'+(running?'tpause':'tresume')+'">'+(running?'Pause':'Resume')+'</button>';
     h+='<button class="btn pri" type="button" data-act="tstop">Stop &amp; save</button></div></div>';
-  }else if(nx){
-    h+='<div class="btns"><button class="btn pri big" type="button" data-act="start" data-ck="'+nx.ck+'">Start studying</button><button class="btn" type="button" data-act="goto" data-ck="'+nx.ck+'">View</button></div>';
+  }else{
+    h+='<div class="btns"><button class="btn pri big" type="button" data-act="start" data-ck="'+pk.ck+'">Start studying</button><button class="btn" type="button" data-act="goto" data-ck="'+pk.ck+'">View</button></div>';
   }
   h+='</section>';
 
@@ -1180,6 +1265,10 @@ app.addEventListener('change',function(e){
   if(act==='tick'){
     if(el.checked){if(!S.done[el.dataset.id])bumpDay(1);S.done[el.dataset.id]=1}else{if(S.done[el.dataset.id])bumpDay(-1);delete S.done[el.dataset.id]}
     save();updateStats();markFull();
+  }else if(act==='picks'){
+    S.pick={ck:firstOpenIn(el.value)};save();render();
+  }else if(act==='pickc'){
+    S.pick={ck:el.value};save();render();
   }else if(act==='exam'){
     var ex=byId(S.examList,el.dataset.key);
     if(ex){ex.d=el.value;save()}
@@ -1227,6 +1316,7 @@ function saveName(){
 }
 app.addEventListener('keydown',function(e){
   var ds=e.target.dataset||{};
+  if((e.key==='Enter'||e.key===' ')&&ds.act==='hday'){e.preventDefault();e.target.click();return}
   if(e.key!=='Enter')return;
   if(ds.act&&ds.act.indexOf('cm')===0){e.preventDefault();cmKey(ds.act);return}
   if(ds.act==='addin'){e.preventDefault();addTopic(ds.ck)}
@@ -1239,6 +1329,7 @@ app.addEventListener('click',function(e){
   if(!el)return;
   var act=el.dataset.act;
   if(act.indexOf('cm')===0){cmClick(el,act);return}
+  if(act==='hday'){hday=el.dataset.day;var hs=app.querySelector('section.heat');if(hs)hs.outerHTML=heatHtml();return}
   if(act==='paper'){curPaper[el.dataset.sid]=el.dataset.p;render()}
   else if(act==='weak'){
     if(S.weak[el.dataset.id])delete S.weak[el.dataset.id];else S.weak[el.dataset.id]=1;
@@ -1255,7 +1346,7 @@ app.addEventListener('click',function(e){
   }else if(act==='pomoskip'){pomoNext();save();render()}
   else if(act==='pomoreset'){
     var pq=S.pomo,dn=pomoTotal()-pomoRem();
-    if(pq.m==='f'&&dn>=60)addLog(dn);
+    if(pq.m==='f'&&dn>=60){var pk2=pickedChapter();addLog(dn,pk2&&pk2.ck)}
     pq.end=0;pq.rem=pomoTotal();save();render();
   }
   else if(act==='add'){addTopic(el.dataset.ck)}
@@ -1290,7 +1381,7 @@ app.addEventListener('click',function(e){
     if(S.timer){S.timer.startedAt=Date.now();save();render()}
   }else if(act==='tstop'){
     var sec=elapsed();
-    if(sec>0){var k=dkey(new Date());S.log[k]=(S.log[k]||0)+sec}
+    if(sec>0)addLog(sec,S.timer&&S.timer.ck);
     S.timer=null;save();render();
   }else if(act==='goto'){gotoChapter(el.dataset.ck)}
   else if(act==='backup'){
